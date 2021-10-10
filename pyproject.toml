@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "coincalc"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+requests = "^2.26.0"
+google-api-python-client = "^2.24.0"
+google-auth-httplib2 = "^0.1.0"
+google-auth-oauthlib = "^0.4.6"
+click = "^8.0.2"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+ipython = "^7.28.0"
+yapf = "^0.31.0"
+
+[tool.poetry.scripts]
+coin = 'coincalc.cli:update_sheet'
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
