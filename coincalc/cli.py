@@ -2,12 +2,12 @@ from datetime import datetime
 import logging
 import os.path
 
-import click
 import requests
 from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 
 from googleapiclient.discovery import build
+import google.auth
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -20,8 +20,9 @@ API_BASE = 'https://www.coincalculators.io/api'
 def fetch_coin_details(s: requests.Session, hashrate: int, power: float,
                        powercost: float) -> dict:
     retry_strat = Retry(
-        total=12,
+        total=20,
         status_forcelist=[429, 500, 502, 503, 504],
+        backoff_factor=2
     )
     s.mount('https://', HTTPAdapter(max_retries=retry_strat))
     params = {
@@ -40,7 +41,7 @@ def fetch_coin_details(s: requests.Session, hashrate: int, power: float,
     return req.json()
 
 
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 
 def fetch_creds() -> Credentials:
@@ -48,19 +49,13 @@ def fetch_creds() -> Credentials:
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
     # time.
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    # If there are no (valid) credentials available, let the user log in.
+
+    creds, program = google.auth.default(scopes=SCOPES)
+    logger.info(f"Acquired credentials for program {program}")
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+        creds.refresh(Request())
+
+
     return creds
 
 
@@ -80,26 +75,28 @@ def convert_megahash(ctx, param, value):
     return value * 1000000
 
 
-@click.command()
-@click.option('--sheet-id',
-              required = True,
-              help='Google Sheets Unique ID')
-@click.option('--hashrate',
-              default=62,
-              help="Hashrate in MH/s",
-              callback=convert_megahash,
-              type=int)
-@click.option('--wattage',
-              type=float,
-              default=130.0,
-              help='Wattage consumed by card')
-@click.option('--power-rate',
-              type=float,
-              default=0.122,
-              help="Power utility cost in killowatt/hr/dollar")
-def update_sheet(sheet_id, hashrate, wattage, power_rate):
+# @click.command()
+# @click.option('--sheet-id',
+#               required = True,
+#               help='Google Sheets Unique ID')
+# @click.option('--hashrate',
+#               default=62,
+#               help="Hashrate in MH/s",
+#               callback=convert_megahash,
+#               type=int)
+# @click.option('--wattage',
+#               type=float,
+#               default=130.0,
+#               help='Wattage consumed by card')
+# @click.option('--power-rate',
+#               type=float,
+#               default=0.122,
+#               help="Power utility cost in killowatt/hr/dollar")
+def update_sheet(sheet_id: str, hashrate: int = 62000000, wattage: float = 130.0, power_rate: float = 0.122):
     s = requests.Session()
+    logger.info("Fetching coin details")
     coin_info = fetch_coin_details(s, hashrate, wattage, power_rate)
+    logger.info("Coin details fetched successfully")
     columns = [
         'lastUpdate', 'rewardsInDay', 'revenueInDayUSD', 'profitInDayUSD'
     ]
@@ -110,6 +107,11 @@ def update_sheet(sheet_id, hashrate, wattage, power_rate):
     # Adjust eth profit based on power usage, etc
     eth_profit = coin_info.get('profitInDayUSD') / coin_info.get(
         'revenueInDayUSD') * coin_info.get('rewardsInDay')
+    logger.info("Calculating ETH Profit")
     rows[0].extend([hashrate, wattage, power_rate, eth_profit])
+    logger.info("Authenticating with Google APIs")
     creds = fetch_creds()
+    logger.info("Posting data to google sheet")
     add_row(sheet_id, creds, rows)
+    logger.info("All work completed!")
+    return 'Successful Update'
