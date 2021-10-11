@@ -19,11 +19,9 @@ API_BASE = 'https://www.coincalculators.io/api'
 
 def fetch_coin_details(s: requests.Session, hashrate: int, power: float,
                        powercost: float) -> dict:
-    retry_strat = Retry(
-        total=20,
-        status_forcelist=[429, 500, 502, 503, 504],
-        backoff_factor=2
-    )
+    retry_strat = Retry(total=9,
+                        status_forcelist=[429, 500, 502, 503, 504],
+                        backoff_factor=2)
     s.mount('https://', HTTPAdapter(max_retries=retry_strat))
     params = {
         "hashrate": hashrate,
@@ -54,7 +52,6 @@ def fetch_creds() -> Credentials:
     logger.info(f"Acquired credentials for program {program}")
     if not creds or not creds.valid:
         creds.refresh(Request())
-
 
     return creds
 
@@ -92,7 +89,10 @@ def convert_megahash(ctx, param, value):
 #               type=float,
 #               default=0.122,
 #               help="Power utility cost in killowatt/hr/dollar")
-def update_sheet(sheet_id: str, hashrate: int = 62000000, wattage: float = 130.0, power_rate: float = 0.122):
+def update_sheet(sheet_id: str,
+                 hashrate: int = 61000000,
+                 wattage: float = 130.0,
+                 power_rate: float = 0.122):
     s = requests.Session()
     logger.info("Fetching coin details")
     coin_info = fetch_coin_details(s, hashrate, wattage, power_rate)
