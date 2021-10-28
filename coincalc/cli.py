@@ -90,7 +90,7 @@ def convert_megahash(ctx, param, value):
 #               default=0.122,
 #               help="Power utility cost in killowatt/hr/dollar")
 def update_sheet(sheet_id: str,
-                 hashrate: int = 61000000,
+                 hashrate: int = 60000000,
                  wattage: float = 130.0,
                  power_rate: float = 0.122):
     s = requests.Session()
